@@ -1,0 +1,11 @@
+snapshot:
+  target:
+    entity:
+      integration: nohassle_amp
+      domain: media_player
+
+restore:
+  target:
+    entity:
+      integration: nohassle_amp
+      domain: media_player

@@ -1,0 +1,67 @@
+{
+  "title": "No Hassle AV Amplifier",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add your amplifier",
+        "description": "An amplifier set up under the Monoprice integration was found. Import it to keep its zones, tone controls, names, areas and history. The amplifier is unavailable for a moment while it moves.",
+        "menu_options": {
+          "migrate": "Import the existing amplifier",
+          "manual": "Set up an amplifier by address"
+        }
+      },
+      "migrate": {
+        "title": "Choose the amplifier to import",
+        "data": {
+          "legacy_entry_id": "Amplifier"
+        }
+      },
+      "manual": {
+        "title": "Connect your amplifier",
+        "description": "Enter its serial device or serial-over-IP address. Do not add an amplifier that another integration already controls on the same port.",
+        "data": {
+          "port": "Connection address",
+          "source_1": "Input 1 name",
+          "source_2": "Input 2 name",
+          "source_3": "Input 3 name",
+          "source_4": "Input 4 name",
+          "source_5": "Input 5 name",
+          "source_6": "Input 6 name"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the amplifier.",
+      "unknown": "Connection failed. Check the Home Assistant logs."
+    },
+    "abort": {
+      "already_configured": "An amplifier on this connection is already set up in No Hassle AV Amplifier.",
+      "legacy_not_found": "No amplifier from the Monoprice integration was found to import."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Amplifier input names",
+        "data": {
+          "source_1": "Input 1 name",
+          "source_2": "Input 2 name",
+          "source_3": "Input 3 name",
+          "source_4": "Input 4 name",
+          "source_5": "Input 5 name",
+          "source_6": "Input 6 name"
+        }
+      }
+    }
+  },
+  "services": {
+    "snapshot": {
+      "name": "Save amplifier state",
+      "description": "Save the selected amplifier zone state for later restoration."
+    },
+    "restore": {
+      "name": "Restore amplifier state",
+      "description": "Restore the selected amplifier zone snapshot."
+    }
+  }
+}

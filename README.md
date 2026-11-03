@@ -38,29 +38,37 @@ control the same amplifier at the same time. Moving from one of those is below.
 
 ## Moving from the Monoprice integration
 
-If your amplifier is set up under the **Monoprice** integration (Home Assistant's
-built-in one, No Hassle AV 0.2.x, or ha-monoprice-tone-controls), this integration
-can take it over and keep **every entity ID, the history, custom names, areas,
-disabled zones and your input names**.
+This integration does not read, move or remove another integration's entries,
+devices or entities, so moving an amplifier set up under the **Monoprice**
+integration (Home Assistant's built-in one, No Hassle AV 0.2.x, or
+ha-monoprice-tone-controls) is a new setup:
 
-1. Make a full Home Assistant backup.
-2. Install this integration through HACS and restart Home Assistant.
-3. Open **Settings > Devices & services > Add integration > No Hassle AV
-   Amplifier** and choose **Import the existing amplifier**.
-4. The amplifier is unavailable for a moment while its entities and devices move
-   and the old entry is removed. Check that your zones and sliders are back with
-   their old names.
-5. If you used ha-monoprice-tone-controls, uninstall it in HACS afterwards. It is
-   no longer needed.
-
-Do not delete entities that show as unavailable or "no longer provided" while this
-happens; they come back. If the old Monoprice entry cannot be removed
-automatically, the log says so and it can be deleted from **Settings > Devices &
-services** after the import.
+1. Note your input names, then remove the old entry under **Settings > Devices &
+   services**. If you used ha-monoprice-tone-controls, uninstall it in HACS.
+2. Restart Home Assistant so the serial port is free, then follow **Install** above.
+3. Set your areas, disabled zones and any custom names or entity IDs again, and
+   check the dashboards and automations that use the zones.
 
 Anything of yours that calls `monoprice.snapshot` or `monoprice.restore` must call
-`nohassle_amp.snapshot` or `nohassle_amp.restore` instead. Entity IDs are
-unchanged, so dashboards and automations that use the zones keep working.
+`nohassle_amp.snapshot` or `nohassle_amp.restore` instead.
+
+**To keep your entity IDs and history,** version 0.1.0 can still import the old
+entry:
+
+1. Make a full Home Assistant backup.
+2. In HACS, open **No Hassle AV Amplifier**, choose **Redownload** and pick **0.1.0**.
+3. Restart Home Assistant, then open **Add integration > No Hassle AV Amplifier**
+   and choose **Import the existing amplifier**.
+4. Check that your zones and sliders still have their old names, then update to
+   the latest version.
+
+## Upgrading
+
+**From 0.1.0:** update in HACS and restart Home Assistant. An amplifier whose import
+to 0.1.0 finished keeps its entity IDs, names and history. Check first that the
+amplifier and its entities work. 0.2.0 cannot finish an import that was interrupted;
+if the log says an import may not have finished, install 0.1.0, restart, then update
+again.
 
 ## Development and validation
 

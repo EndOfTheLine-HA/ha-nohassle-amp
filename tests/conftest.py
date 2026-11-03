@@ -19,11 +19,6 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 
-# The amplifier chain: three amps, six zones each.
-ZONES = [10 * amp + zone for amp in (1, 2, 3) for zone in range(1, 7)]
-ENABLED_ZONES = [11, 12, 13, 14, 15, 16]
-TONES = ("bass", "treble", "balance")
-
 
 @pytest.fixture
 async def hass(tmp_path):
@@ -53,10 +48,8 @@ async def hass(tmp_path):
 class FakeAmp:
     """Stands in for pymonoprice.Monoprice. Zone 11 is on, the rest are off."""
 
-    def __init__(self, name: str = "amp", events: list | None = None) -> None:
-        self.name = name
-        self._port = SimpleNamespace(close=Mock(side_effect=self._closed))
-        self.events = events if events is not None else []
+    def __init__(self) -> None:
+        self._port = SimpleNamespace(close=Mock())
         for setter in (
             "set_power",
             "set_mute",
@@ -69,9 +62,6 @@ class FakeAmp:
         ):
             setattr(self, setter, Mock())
 
-    def _closed(self):
-        self.events.append(f"close {self.name}")
-
     def zone_status(self, zone: int) -> ZoneStatus:
         # treble/bass 7 and balance 10 are the middle of their ranges.
         return ZoneStatus(zone, False, zone == 11, False, False, 10, 7, 7, 10, 1, True)
@@ -79,14 +69,7 @@ class FakeAmp:
 
 @pytest.fixture
 def amp():
-    """The simulated amplifier every new entry connects to, with an event log."""
-    events: list[str] = []
-    fake = FakeAmp("new", events)
-
-    def opened(port):
-        events.append("open new")
-        return fake
-
-    with patch("custom_components.nohassle_amp.get_monoprice", side_effect=opened):
-        fake.events = events
+    """The simulated amplifier every new entry connects to."""
+    fake = FakeAmp()
+    with patch("custom_components.nohassle_amp.get_monoprice", return_value=fake):
         yield fake

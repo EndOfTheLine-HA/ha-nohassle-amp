@@ -16,16 +16,10 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.selector import (
-    SelectOptionDict,
-    SelectSelector,
-    SelectSelectorConfig,
-    SerialPortSelector,
-)
+from homeassistant.helpers.selector import SerialPortSelector
 from homeassistant.helpers.typing import VolDictType
 
 from .const import (
-    CONF_LEGACY_ENTRY_ID,
     CONF_SOURCE_1,
     CONF_SOURCE_2,
     CONF_SOURCE_3,
@@ -35,7 +29,6 @@ from .const import (
     CONF_SOURCES,
     DOMAIN,
 )
-from .migration import legacy_amp_entries, legacy_entry_data, legacy_entry_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,74 +79,9 @@ async def validate_input(hass: HomeAssistant, data):
 
 
 class MonoPriceConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Add an amplifier, or import one set up under the old `monoprice` domain."""
+    """Add an amplifier."""
 
     VERSION = 1
-
-    @override
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Offer the import when an old amplifier entry exists."""
-        if legacy_amp_entries(self.hass):
-            return self.async_show_menu(
-                step_id="user", menu_options=["migrate", "manual"]
-            )
-        return await self.async_step_manual()
-
-    async def async_step_migrate(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Import an amplifier that was set up under the old `monoprice` domain."""
-        legacy = legacy_amp_entries(self.hass)
-        if not legacy:
-            return self.async_abort(reason="legacy_not_found")
-        if len(legacy) == 1:
-            return self._async_import(legacy[0])
-        if user_input is not None:
-            chosen = self.hass.config_entries.async_get_entry(
-                user_input[CONF_LEGACY_ENTRY_ID]
-            )
-            if chosen is None or chosen not in legacy:
-                return self.async_abort(reason="legacy_not_found")
-            return self._async_import(chosen)
-        return self.async_show_form(
-            step_id="migrate",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_LEGACY_ENTRY_ID): SelectSelector(
-                        SelectSelectorConfig(
-                            options=[
-                                SelectOptionDict(
-                                    value=entry.entry_id, label=entry.title
-                                )
-                                for entry in legacy
-                            ]
-                        )
-                    )
-                }
-            ),
-        )
-
-    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
-        """Import a named old entry (for scripts and tests)."""
-        legacy = self.hass.config_entries.async_get_entry(
-            import_data.get(CONF_LEGACY_ENTRY_ID, "")
-        )
-        if legacy is None or legacy not in legacy_amp_entries(self.hass):
-            return self.async_abort(reason="legacy_not_found")
-        return self._async_import(legacy)
-
-    @callback
-    def _async_import(self, legacy: ConfigEntry) -> ConfigFlowResult:
-        """Create the new entry; its setup moves the devices and entities."""
-        if self._port_in_use(legacy.data[CONF_PORT]):
-            return self.async_abort(reason="already_configured")
-        return self.async_create_entry(
-            title=legacy.title,
-            data=legacy_entry_data(legacy),
-            options=legacy_entry_options(legacy),
-        )
 
     @callback
     def _port_in_use(self, port: str) -> bool:
@@ -162,7 +90,8 @@ class MonoPriceConfigFlow(ConfigFlow, domain=DOMAIN):
             entry.data.get(CONF_PORT) == port for entry in self._async_current_entries()
         )
 
-    async def async_step_manual(
+    @override
+    async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Set up an amplifier by its serial address."""
@@ -180,7 +109,7 @@ class MonoPriceConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
 
         return self.async_show_form(
-            step_id="manual", data_schema=DATA_SCHEMA, errors=errors
+            step_id="user", data_schema=DATA_SCHEMA, errors=errors
         )
 
     @staticmethod

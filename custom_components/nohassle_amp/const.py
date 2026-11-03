@@ -2,13 +2,9 @@
 
 DOMAIN = "nohassle_amp"
 
-# Amp entries made before 0.1.0 live in this domain: the temporary
-# ha-monoprice-tone-controls repository, an earlier No Hassle AV, or HA's built-in
-# Monoprice integration.
-LEGACY_DOMAIN = "monoprice"
-
-CONF_MIGRATED_FROM = "migrated_from"
-CONF_LEGACY_ENTRY_ID = "legacy_entry_id"
+# Written by the 0.1.0 import and removed once it finished. 0.2.0 no longer imports
+# anything; it only warns if an entry still carries the marker.
+CONF_IMPORT_MARKER = "migrated_from"
 
 CONF_SOURCES = "sources"
 

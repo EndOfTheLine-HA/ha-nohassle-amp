@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+import logging
+from types import MappingProxyType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -11,20 +12,80 @@ from serialx import SerialException
 from custom_components.nohassle_amp.const import DOMAIN
 from custom_components.nohassle_amp.media_player import MonopriceZone
 from custom_components.nohassle_amp.number import NUMBERS, MonopriceZoneNumber
-from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
-from homeassistant.helpers import entity_registry as er
+from homeassistant.config_entries import (
+    SOURCE_IMPORT,
+    SOURCE_USER,
+    ConfigEntry,
+    ConfigEntryState,
+)
+from homeassistant.data_entry_flow import UnknownStep
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import FakeAmp
 
 PORT = "socket://192.0.2.20:4999"  # documentation address, never a real amplifier
+OLD_PORT = "socket://192.0.2.21:4999"  # documentation address, as above
 SOURCES = [{1: "Input 1"}, {"Input 1": 1}, ["Input 1"]]
 
 
+def add_entry(hass, domain, data):
+    entry = ConfigEntry(
+        domain=domain,
+        title=PORT,
+        data=data,
+        options={},
+        source=SOURCE_USER,
+        unique_id=None,
+        version=1,
+        minor_version=1,
+        discovery_keys=MappingProxyType({}),
+        subentries_data=[],
+    )
+    hass.config_entries._entries[entry.entry_id] = entry
+    return entry
+
+
+@pytest.fixture
+def old_amp(hass):
+    """An amplifier left under the built-in integration, with its registries."""
+    entry = add_entry(hass, "monoprice", {"port": OLD_PORT, "sources": {}})
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("monoprice", f"{entry.entry_id}_11")},
+        name="Zone 11",
+    )
+    entity = er.async_get(hass).async_get_or_create(
+        "media_player",
+        "monoprice",
+        f"{entry.entry_id}_11",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id="old_zone_11",
+    )
+    return entry, device, entity
+
+
+def assert_old_amp_untouched(hass, old_amp):
+    entry, device, entity = old_amp
+    assert hass.config_entries.async_get_entry(entry.entry_id) is entry
+    assert dr.async_get(hass).async_get(device.id) == device
+    assert er.async_get(hass).async_get(entity.entity_id) == entity
+
+
+def import_warnings(caplog):
+    return [
+        record
+        for record in caplog.records
+        if record.levelno == logging.WARNING
+        and "may not have finished" in record.getMessage()
+    ]
+
+
 def test_unique_ids_are_pinned():
-    """These formats are what the amp migration rewrites the prefix of.
+    """Existing installs are keyed on these formats.
 
     The same shape as Home Assistant's built-in Monoprice integration, so an
-    amplifier imported from it keeps every entity.
+    amplifier imported by 0.1.0 kept every entity.
     """
     runtime = SimpleNamespace(client=Mock(), zone_status={})
     zone = MonopriceZone(runtime.client, SOURCES, "entry-1", 11, runtime)
@@ -61,7 +122,7 @@ async def test_manual_setup_creates_a_working_amplifier(hass, amp):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
         )
-        assert result["step_id"] == "manual"  # no old amplifier, no menu
+        assert result["step_id"] == "user"
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"port": PORT, "source_1": "TV"}
         )
@@ -79,6 +140,74 @@ async def test_manual_setup_creates_a_working_amplifier(hass, amp):
     assert er.async_get(hass).async_get("media_player.zone_11").unique_id == (
         f"{entry.entry_id}_11"
     )
+
+
+async def test_an_old_monoprice_amplifier_is_left_alone(hass, amp, old_amp):
+    with patch("custom_components.nohassle_amp.config_flow.get_monoprice"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_USER}
+        )
+        assert result["type"] == "form" and result["step_id"] == "user"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"port": PORT}
+        )
+    await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert result["result"].state is ConfigEntryState.LOADED
+    assert_old_amp_untouched(hass, old_amp)
+
+
+async def test_there_is_no_import_step(hass, old_amp):
+    entry, _, _ = old_amp
+    with pytest.raises(UnknownStep):
+        await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_IMPORT},
+            data={"legacy_entry_id": entry.entry_id},
+        )
+    assert_old_amp_untouched(hass, old_amp)
+
+
+async def test_an_unfinished_import_marker_is_only_warned_about(
+    hass, amp, old_amp, caplog
+):
+    """0.1.0 removes the marker when its import finishes. 0.2.0 cannot finish one."""
+    old_entry, _, _ = old_amp
+    entry = add_entry(
+        hass,
+        DOMAIN,
+        {"port": PORT, "sources": {}, "migrated_from": old_entry.entry_id},
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED  # it still works
+    assert len(import_warnings(caplog)) == 1
+    assert "install version 0.1.0" in import_warnings(caplog)[0].getMessage()
+    assert_old_amp_untouched(hass, old_amp)
+
+
+async def test_an_existing_amplifier_is_not_a_first_run(hass, amp, caplog):
+    """A first run would poll all 18 zones over serial before adding any of them."""
+    entry = add_entry(
+        hass, DOMAIN, {"port": PORT, "sources": {}, "not_first_run": True}
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.first_run is False
+    assert import_warnings(caplog) == []
+
+
+async def test_a_busy_port_is_retried(hass):
+    entry = add_entry(hass, DOMAIN, {"port": PORT, "sources": {}})
+    with patch(
+        "custom_components.nohassle_amp.get_monoprice",
+        side_effect=[SerialException("port busy"), FakeAmp()],
+    ):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        assert entry.state is ConfigEntryState.SETUP_RETRY
+        await hass.config_entries.async_reload(entry.entry_id)
+    assert entry.state is ConfigEntryState.LOADED
 
 
 async def test_a_second_entry_for_the_same_port_is_refused(hass, amp):
@@ -138,7 +267,7 @@ def test_a_client_without_a_port_closes_quietly():
 
 
 def test_close_client_releases_a_real_pymonoprice_connection():
-    """Against the real library, not a fake: the migration depends on this.
+    """Against the real library, not a fake: reloads depend on this.
 
     pymonoprice has no close(), so close_client uses its private port. If a future
     release renames it, this fails here instead of leaving the port held on a live

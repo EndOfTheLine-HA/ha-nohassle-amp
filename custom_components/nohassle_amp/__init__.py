@@ -19,8 +19,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .connection import close_client
-from .const import CONF_MIGRATED_FROM, CONF_NOT_FIRST_RUN, DOMAIN
-from .migration import async_finish_migration
+from .const import CONF_IMPORT_MARKER, CONF_NOT_FIRST_RUN, DOMAIN
 from .services import async_setup_services
 
 PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER]
@@ -51,11 +50,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: MonopriceConfigEntry) -> bool:
     """Set up one amplifier from a config entry."""
-    # An amplifier imported from the old `monoprice` domain takes over its devices
-    # and entities here, before the serial port is opened, so entity IDs and
-    # history carry over and the old entry has released the port.
-    if entry.data.get(CONF_MIGRATED_FROM):
-        await async_finish_migration(hass, entry)
+    if entry.data.get(CONF_IMPORT_MARKER):
+        _LOGGER.warning(
+            "%s was created by an import from an earlier version that may not have "
+            "finished, and this version cannot finish it. If its entities show as "
+            "no longer provided, install version 0.1.0, restart Home Assistant, then "
+            "update again",
+            entry.title,
+        )
 
     port = entry.data[CONF_PORT]
 

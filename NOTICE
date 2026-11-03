@@ -6,7 +6,6 @@ Upstream: https://github.com/home-assistant/core/tree/2026.9.4/homeassistant/com
 Original manifest codeowners: @etsinko and @OnFreund.
 
 EndOfTheLine-HA added bass, treble and balance entities with cached zone state, its
-own domain (nohassle_amp), an import that moves an existing Monoprice amplifier
-across with its entities and devices, and an explicit release of the serial port.
+own domain (nohassle_amp) and an explicit release of the serial port.
 Zone entity identifiers and snapshot/restore service names are otherwise retained.
 No affiliation with Monoprice, No Hassle AV, or Home Assistant is implied.

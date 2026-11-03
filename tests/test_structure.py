@@ -16,7 +16,7 @@ def test_metadata():
     assert manifest["domain"] == PACKAGE.name == "nohassle_amp"
     # Hassfest rejects an exact pin of a package Home Assistant core depends on.
     assert manifest["requirements"] == ["pymonoprice>=0.6.1"]
-    assert manifest["version"] == project["project"]["version"] == "0.1.0"
+    assert manifest["version"] == project["project"]["version"] == "0.2.0"
 
 
 def test_it_does_not_replace_a_built_in_integration():
@@ -24,6 +24,24 @@ def test_it_does_not_replace_a_built_in_integration():
     assert [path.name for path in (ROOT / "custom_components").iterdir()] == [
         "nohassle_amp"
     ]
+
+
+def test_nothing_touches_another_integration():
+    """Setup and flows stay inside this domain, as the HACS review asked."""
+    assert not (PACKAGE / "migration.py").exists()
+    forbidden = (
+        '"monoprice"',
+        "legacy",
+        "async_update_entity_platform",
+        "async_update_device",
+        "config_entries.async_remove",
+    )
+    for path in PACKAGE.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for word in forbidden:
+            assert word not in text, f"{path.name}: {word}"
+    strings = (PACKAGE / "strings.json").read_text(encoding="utf-8")
+    assert "migrate" not in strings and "legacy" not in strings
 
 
 def test_services_target_this_integration():

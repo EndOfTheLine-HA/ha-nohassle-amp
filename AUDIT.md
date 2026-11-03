@@ -20,49 +20,34 @@ temporary ha-monoprice-tone-controls repository, which kept the `monoprice` doma
 - Zone unique IDs are `<entry ID>_<zone>`, tone-control unique IDs are
   `<entry ID>_<zone>_<bass|treble|balance>`, and a zone's device identifier is
   `(nohassle_amp, "<entry ID>_<zone>")`. The same shape as the built-in
-  integration, which is what the migration rewrites the prefix of.
+  integration. Existing installs are keyed on these formats.
 - Tone controls read the zone status the media player already caches; setting one
   sends a single command with the amplifier's offset.
-- A new amplifier is detected as a first run; an imported one is not, so its 18
-  zones are not polled over serial before being added.
+- A new amplifier is detected as a first run; an entry that has already run is not,
+  so its 18 zones are not polled over serial before being added.
 - A second entry for a connection that is already configured is refused.
+- A serial port that is busy at setup is retried.
 - Unloading releases the serial port.
+- An amplifier entry left under the `monoprice` domain, with its devices and
+  entities, is not changed by adding an amplifier here or by an unfinished import
+  marker.
 
-## Amplifier migration
+## No import from other integrations
 
-An amplifier entry in the `monoprice` domain (HTTP matrix entries, which share that
-domain, are excluded) is imported by the config flow, which creates a `nohassle_amp`
-entry marked with the old entry's ID and copies its connection, input names
-(`sources`), options and first-run flag. Before the serial port is opened, that
-entry's setup:
+Version 0.1.0 could import an amplifier entry from the `monoprice` domain, moving
+its devices and entities and removing the old entry. Version 0.2.0 removes that
+import after review feedback that an integration should leave another integration's
+entries alone. Nothing in this integration now reads, moves or removes another
+integration's config entries, devices or entities. An entry that still carries the
+marker of an import that did not finish gets a warning in the log and is otherwise
+set up normally. Version 0.1.0 stays available for anyone who needs the import.
 
-1. Remembers the old entry's connection, unloads the old entry (entities can only
-   change integration while not loaded) and fails without moving anything if the
-   unload is refused.
-2. Closes the old serial connection explicitly. serialx opens the port exclusively
-   and releases it only when the Python object is destroyed; `pymonoprice` has no
-   `close()`, so `connection.close_client` closes its private port. A test against
-   the real library, over a local TCP socket, shows the connection is released
-   while the object is still alive.
-3. Moves every entity (disabled ones included) with
-   `entity_registry.async_update_entity_platform`, rewriting the unique-ID prefix.
-   Entity IDs, history, custom names, options and disabled flags are kept.
-4. Moves every device with one `async_update_device` call (new entry ID and
-   identifiers), keeping its ID, area, user-given name and disabled state. Entities
-   move first because moving a device removes any of its entities still registered
-   to the old entry.
-5. Removes the old entry. A failure is logged and never undoes the move.
-6. Clears the marker, then opens the port. If it is still held, setup raises
-   `ConfigEntryNotReady` and Home Assistant retries; the migration is idempotent.
+## Serial connection
 
-Tests run this on real isolated area, device and entity registries shaped like a
-real install: 18 zone devices (12 disabled), 72 entities (48 disabled), a renamed
-device in an area, a renamed entity and custom input names. Fourteen mutation checks
-cover each ordering and API-use decision: devices before entities, no unload, no
-close, no prefix rewrite, skipping disabled devices, marker kept, options dropped,
-failed unload ignored, matrix entries counted, port not released on unload,
-first-run flag dropped, existing-entry check dropped, migration after the port is
-opened and removal failure not tolerated.
+serialx opens the port exclusively and releases it only when the Python object is
+destroyed; `pymonoprice` has no `close()`, so `connection.close_client` closes its
+private port when the entry unloads. A test against the real library, over a local
+TCP socket, shows the connection is released while the object is still alive.
 
 ## Deliberate exclusions
 
@@ -72,9 +57,7 @@ opened and removal failure not tolerated.
 
 ## Validation boundary
 
-Automated tests use simulated amplifier responses. **The migration has not yet been
-run on a real installation or a real serial connection.** What only a live run can
-show is whether the old integration's process lets go of the port in time; the
-explicit close and the retry are there to cover that. CI runs Ruff, the tests on Home
-Assistant 2026.9.4 and 2026.10.2, HACS validation and Hassfest. Long-term behaviour
-with every amplifier firmware is not claimed.
+Automated tests use simulated amplifier responses. **Version 0.2.0 has not been run
+on a real amplifier.** CI runs Ruff, the tests on Home Assistant 2026.9.4 and
+2026.10.2, HACS validation and Hassfest. Long-term behaviour with every amplifier
+firmware is not claimed.

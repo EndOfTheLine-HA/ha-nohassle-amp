@@ -3,20 +3,6 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add your amplifier",
-        "description": "An amplifier set up under the Monoprice integration was found. Import it to keep its zones, tone controls, names, areas and history. The amplifier is unavailable for a moment while it moves.",
-        "menu_options": {
-          "migrate": "Import the existing amplifier",
-          "manual": "Set up an amplifier by address"
-        }
-      },
-      "migrate": {
-        "title": "Choose the amplifier to import",
-        "data": {
-          "legacy_entry_id": "Amplifier"
-        }
-      },
-      "manual": {
         "title": "Connect your amplifier",
         "description": "Enter its serial device or serial-over-IP address. Do not add an amplifier that another integration already controls on the same port.",
         "data": {
@@ -35,8 +21,7 @@
       "unknown": "Connection failed. Check the Home Assistant logs."
     },
     "abort": {
-      "already_configured": "An amplifier on this connection is already set up in No Hassle AV Amplifier.",
-      "legacy_not_found": "No amplifier from the Monoprice integration was found to import."
+      "already_configured": "An amplifier on this connection is already set up in No Hassle AV Amplifier."
     }
   },
   "options": {
